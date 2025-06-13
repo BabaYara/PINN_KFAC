@@ -19,6 +19,9 @@ available. The `pinns` module now also exposes a simple `train_pinn` routine
 for quick experiments with KFAC training.  The `pinns.operators` submodule
 includes helpers like `poisson_residual` for assembling common PDE losses.
 
+The operators module now also provides `heat_residual` for the 1D heat
+equation, making it easy to experiment with time-dependent problems.
+
 ## Example
 
 Several notebooks in the `notebooks/` folder demonstrate the library.
@@ -29,3 +32,5 @@ Several notebooks in the `notebooks/` folder demonstrate the library.
 `11_kfac_training.ipynb` shows the `train_pinn` helper in action.
 `12_poisson_residual_demo.ipynb` demonstrates computing Poisson residuals with
 the new convenience function.
+`13_heat_residual_demo.ipynb` shows how to evaluate the heat equation residual
+using `heat_residual`.
