@@ -10,6 +10,7 @@ def test_gradient_and_laplacian():
     assert jnp.allclose(grad, 1.0)
     assert jnp.allclose(lap, 0.0)
 
+
 def test_pinn_loss_zero_for_exact_solution():
     # Poisson equation u'' = -sin(x) with u(x) = sin(x)
     model = lambda x: jnp.sin(x)

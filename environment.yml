@@ -1,0 +1,12 @@
+name: taylor-pinns
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - jax
+  - jaxlib
+  - numpy
+  - pip
+  - pip:
+      - matplotlib
+      - jupyter
