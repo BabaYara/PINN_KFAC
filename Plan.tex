@@ -119,7 +119,7 @@ A core component of this repository is a sequence of Jupyter notebooks that prov
 \subsection{Notebook 2: Forward-Mode vs Reverse-Mode AD for PINNs}
 \begin{description}
   \item[\textbf{Goals:}] Demonstrate the challenge of computing high-order derivatives using traditional reverse-mode AD (backpropagation) versus using forward-mode approaches. We use a toy neural network (e.g., a small Multi-Layer Perceptron, MLP) and a simple PDE (such as $u''(x) = \sin(x)$) to show how many derivative calls or graph traversals are needed with each method. The goal is to motivate Taylor-mode AD by highlighting the exponential cost of nested backpropagation.
-  \item[\textbf{Dependencies:}] Requires a basic neural network (which can be defined with a few lines of JAX or PyTorch). Uses the `autograd` or JAX's grad/jacfwd functions to compute derivatives for comparison. Might start using the `taylor_mode` module if it's ready for simple cases, or still keep it self-contained.
+  \item[\textbf{Dependencies:}] Requires a basic neural network (which can be defined with a few lines of JAX or ). Uses the `autograd` or JAX's grad/jacfwd functions to compute derivatives for comparison. Might start using the `taylor_mode` module if it's ready for simple cases, or still keep it self-contained.
   \item[\textbf{Target Paper Sections:}] Introduction of Dangel \textit{et al.}\ (2025) where they note nested reverse-mode scales poorly:contentReference[oaicite:15]{index=15}. Possibly Figure 1 of that paper (comparing forward vs backward for computing a Laplacian) as conceptual reference.
   \item[\textbf{Expected Implementation:}] The agent will implement timing experiments or operation counts: e.g., manually nest reverse-mode (using \texttt{jax.grad} twice for second derivative) and compare with a forward-mode (using \texttt{jax.jacfwd} or our own Taylor-mode function) for computing a second-order derivative. The notebook should include code to measure performance (time or number of operations) and illustrate the difference. The agent might also implement a small utility to perform a second-order derivative via dual numbers or forward AD as an exercise.
 \end{description}
@@ -151,7 +151,7 @@ A core component of this repository is a sequence of Jupyter notebooks that prov
 \subsection{Notebook 6: A Simple PINN Example (Taylor-Mode in Action)}
 \begin{description}
   \item[\textbf{Goals:}] Apply Taylor-mode AD to a basic PINN training scenario. In this notebook, we set up a simple PINN for an easy PDE (e.g., $u'(x) = \cos x$ or $u''(x) = -u(x)$ with known solution) and show how to compute the PINN loss efficiently using Taylor-mode. The aim is to illustrate a full training loop where derivatives for the PDE residual are obtained via our Taylor-mode library rather than standard autodiff.
-  \item[\textbf{Dependencies:}] Requires a deep learning framework (JAX or PyTorch) for defining and training the neural network. We assume the environment has JAX (for example) installed via the environment file. The notebook will use `taylor_mode.forward` to get derivatives. If using JAX, it might alternatively use JAX's jet API for demonstration (but likely our own implementation for clarity).
+  \item[\textbf{Dependencies:}] Requires a deep learning framework (JAX or ) for defining and training the neural network. We assume the environment has JAX (for example) installed via the environment file. The notebook will use `taylor_mode.forward` to get derivatives. If using JAX, it might alternatively use JAX's jet API for demonstration (but likely our own implementation for clarity).
   \item[\textbf{Target Paper Sections:}] This corresponds generally to applications of Taylor-mode AD in PINNs as seen in Wang \textit{et al.}\ (2022) and the experiments of Dangel \textit{et al.}\ (2024) where Taylor-mode was used to compute PINN losses:contentReference[oaicite:19]{index=19}. It doesn't map to a single section but rather demonstrates the end-to-end use of these techniques in training.
   \item[\textbf{Expected Implementation:}] The AI agent will fill in code to define a simple neural network (e.g., a small MLP with one hidden layer), set up the PDE residual calculation using Taylor-mode. For example, implement a training loop where each iteration calls a function \texttt{pinns.compute\_loss(net, batch)} that uses Taylor-mode to obtain $u$, $u'$ (or $u''$ as required) and then computes the mean squared residual. The agent might also implement backpropagation for training as usual, since once the residuals are computed, standard optimizers can be used. The notebook will also highlight how easy it is to switch to a higher-order PDE (just by changing one parameter for derivative order) and still use the same code, underlining the generality of Taylor-mode AD for PINNs.
 \end{description}
@@ -296,7 +296,7 @@ dependencies:
   - numpy=1.24
   - jax=0.4.13        # JAX for high-order AD support
   - jaxlib=0.4.13     # JAX GPU support if available
-  - pytorch=2.0       # PyTorch (if used for models or comparison)
+  - =2.0       #  (if used for models or comparison)
   - matplotlib=3.7    # for plotting results in notebooks
   - pytest=7.4        # for running tests
   - sphinx=5.3        # for documentation
@@ -305,11 +305,11 @@ dependencies:
   - black=23.3        # code formatter (for contributors)
 \end{lstlisting}
 
-We include both JAX and PyTorch in the environment to give flexibility (some notebooks might use JAX for convenience in Taylor-mode, while others could use PyTorch to illustrate broader applicability). If the project solidifies on one framework, the environment can be trimmed accordingly. The environment also pins specific versions to avoid unexpected changes when the environment is updated. 
+We include both JAX and  in the environment to give flexibility (some notebooks might use JAX for convenience in Taylor-mode, while others could use  to illustrate broader applicability). If the project solidifies on one framework, the environment can be trimmed accordingly. The environment also pins specific versions to avoid unexpected changes when the environment is updated. 
 
-For GPU usage, appropriate CUDA toolkit versions would be included or instructions provided (for example, JAX and PyTorch have separate GPU versions). In the interest of simplicity, we might initially target CPU execution in notebooks (which is sufficient for the educational examples) and ensure all code can run without a GPU.
+For GPU usage, appropriate CUDA toolkit versions would be included or instructions provided (for example, JAX and  have separate GPU versions). In the interest of simplicity, we might initially target CPU execution in notebooks (which is sufficient for the educational examples) and ensure all code can run without a GPU.
 
-To help with exact reproducibility of results in notebooks (where randomness might be involved, e.g., in randomized Taylor mode or weight initialization), we set random seeds in each notebook. We also recommend using deterministic flags if available (for instance, forcing single-thread computations or disabling nondeterministic GPU ops in PyTorch) when comparing performance metrics.
+To help with exact reproducibility of results in notebooks (where randomness might be involved, e.g., in randomized Taylor mode or weight initialization), we set random seeds in each notebook. We also recommend using deterministic flags if available (for instance, forcing single-thread computations or disabling nondeterministic GPU ops in ) when comparing performance metrics.
 
 \subsection{Continuous Integration (CI) with GitHub Actions}
 
