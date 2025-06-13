@@ -20,8 +20,9 @@ available.
 ## Example
 
 Several notebooks in the `notebooks/` folder demonstrate the library.
-`08_KFAC_implementation.ipynb` shows a short linear-regression example using
-the `KFACOptimizer` implemented in this package.
+`02_gradient_operator.ipynb` demonstrates computing gradients using Taylor-mode
+utilities. `08_KFAC_implementation.ipynb` shows a short linear-regression
+example using the `KFACOptimizer` implemented in this package.
 
 ## Project Plan
 

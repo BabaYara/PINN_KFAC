@@ -1,3 +1,3 @@
-from .operators import laplacian
+from .operators import gradient, laplacian
 
-__all__ = ["laplacian"]
+__all__ = ["gradient", "laplacian"]
