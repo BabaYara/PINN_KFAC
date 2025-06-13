@@ -7,7 +7,7 @@ from .taylor_mode import (
     forward_derivatives_collapsed,
 )
 from .kron_utils import KFACOptimizer
-from .pinns import laplacian
+from .pinns import gradient, laplacian
 
 __all__ = [
     "Jet",
@@ -15,5 +15,6 @@ __all__ = [
     "stochastic_laplacian",
     "forward_derivatives_collapsed",
     "KFACOptimizer",
+    "gradient",
     "laplacian",
 ]
