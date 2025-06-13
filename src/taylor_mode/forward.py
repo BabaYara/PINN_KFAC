@@ -4,29 +4,28 @@ import jax.numpy as jnp
 from .jet import Jet
 
 
-def forward_derivatives(f: Callable[[jnp.ndarray], jnp.ndarray], x: jnp.ndarray, order: int = 1) -> Tuple[jnp.ndarray, Dict[int, jnp.ndarray]]:
+def forward_derivatives(
+    f: Callable[[jnp.ndarray], jnp.ndarray], x: jnp.ndarray, order: int = 1
+) -> Tuple[jnp.ndarray, Dict[int, jnp.ndarray]]:
     """Compute derivatives of ``f`` at ``x`` up to ``order`` using JAX.
 
-    Parameters
-    ----------
-    f : Callable
-        Scalar-output function.
-    x : jnp.ndarray
-        Input array.
-    order : int
-        Highest derivative order to compute.
-
-    Returns
-    -------
-    value : jnp.ndarray
-        ``f(x)``.
-    derivs : Dict[int, jnp.ndarray]
-        Mapping from derivative order to derivative array.
+    This routine repeatedly applies :func:`jax.jacfwd` to obtain higher-order
+    derivatives. It is intended for scalar-output functions; the returned
+    derivatives have shape ``(input_dim,) * n`` for the ``n``-th order.
     """
+
     value = f(x)
     derivs: Dict[int, jnp.ndarray] = {}
-    if order >= 1:
-        derivs[1] = jax.jacfwd(f)(x)
-    if order >= 2:
-        derivs[2] = jax.jacfwd(jax.jacfwd(f))(x)
+
+    if order < 1:
+        return value, derivs
+
+    jac_fn = jax.jacfwd(f)
+    derivs[1] = jac_fn(x)
+
+    cur_fn = jac_fn
+    for n in range(2, order + 1):
+        cur_fn = jax.jacfwd(cur_fn)
+        derivs[n] = cur_fn(x)
+
     return value, derivs
