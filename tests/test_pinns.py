@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 from pinns import gradient, laplacian
+from pinns.operators import poisson_residual
 
 
 def test_gradient_and_laplacian():
@@ -22,3 +23,11 @@ def test_pinn_loss_zero_for_exact_solution():
 
     loss = pinn_loss(model, X_res, X_bc, bc_vals, forcing)
     assert loss < 1e-6
+
+
+def test_poisson_residual_zero_for_exact_solution():
+    model = lambda x: jnp.sin(x)
+    forcing = lambda x: -jnp.sin(x)
+    x = jnp.linspace(0.0, jnp.pi, 5).reshape(-1, 1)
+    res = poisson_residual(model, x, forcing)
+    assert jnp.allclose(res, 0.0)
