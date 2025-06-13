@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """Minimal KFAC optimizer for fully-connected layers."""
 
 from dataclasses import dataclass
@@ -28,9 +29,7 @@ class KFACOptimizer:
         states = []
         for p in params:
             out_dim, in_dim = p.shape
-            states.append(
-                LayerState(jnp.eye(in_dim), jnp.eye(out_dim))
-            )
+            states.append(LayerState(jnp.eye(in_dim), jnp.eye(out_dim)))
         return states
 
     def update(
@@ -87,4 +86,3 @@ class KFACOptimizer:
         """Convenience wrapper for :meth:`update`."""
 
         return self.update(params, grads, acts, backprops, state)
-

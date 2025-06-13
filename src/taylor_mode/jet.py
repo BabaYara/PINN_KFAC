@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Dict
 import jax.numpy as jnp
 
+
 @dataclass
 class Jet:
     """Representation of a function's value and its derivatives.
