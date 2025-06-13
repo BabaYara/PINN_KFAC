@@ -1,0 +1,430 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{basicstyle=\ttfamily\small, breaklines=true}
+
+\begin{document}
+
+\begin{titlepage}
+    \centering
+    {\LARGE \textbf{Taylor Mode PINNs}\par}
+    \vspace{1cm}
+    {\Large Fahiz Baba-Yara\par}
+    \vfill
+    {\large \today\par}
+\end{titlepage}
+
+\hypersetup{hidelinks}
+\tableofcontents
+\newpage
+
+\section{Project Overview}
+
+Physics-Informed Neural Networks (PINNs) are neural networks trained to satisfy physical laws described by Partial Differential Equations (PDEs) by including PDE residuals in the loss function. Computing these residuals often requires high-order derivatives of the network outputs with respect to inputs, which is computationally challenging with standard automatic differentiation (AD) techniques. **Taylor-mode Automatic Differentiation (AD)** is an advanced forward-mode AD technique that propagates higher-order derivative information (Taylor series coefficients) through the network in one forward pass, avoiding the exponential blowup of repeatedly nested backpropagation:contentReference[oaicite:0]{index=0}. This repository aims to teach and implement Taylor-mode AD for PINNs, leveraging recent research that exploits the *Kronecker structure* in these problems to improve efficiency.
+
+Recent papers have demonstrated the power of Taylor-mode AD and Kronecker-factorization in the context of PINNs. For instance, Bettencourt \textit{et al.}\ (2019) introduced Taylor-mode AD in JAX (Google's Just-In-Time compiled Autograd library) to efficiently compute higher-order derivatives without repeated reverse-mode sweeps:contentReference[oaicite:1]{index=1}. Building on this foundation, Dangel \textit{et al.}\ (2024) showed that one can treat the computation of a PINN's PDE residual as a larger computational graph with shared weights (effectively an expanded network encoding derivative computations), which enables applying Kronecker-Factored Approximate Curvature (KFAC) to PINNs:contentReference[oaicite:2]{index=2}. Their method, **KFAC for PINNs**, drastically reduces the cost of second-order optimization by approximating the curvature (Fisher information matrix or Gauss-Newton matrix) as a layer-wise Kronecker product, and crucially captures contributions from the PDE's differential operator beyond what standard KFAC would handle:contentReference[oaicite:3]{index=3}. Another line of work by Shi \textit{et al.}\ (2024) introduced a *stochastic Taylor-mode* approach, showing that randomized forward propagation of high-order derivatives can scale PINN training to extremely high-dimensional problems with remarkable efficiency:contentReference[oaicite:4]{index=4}:contentReference[oaicite:5]{index=5}. Their **Stochastic Taylor Derivative Estimator** yields over 1000× speed-up and >30× memory reduction compared to naive methods, enabling solutions of, for example, 1-million-dimensional PDEs in minutes on a single GPU:contentReference[oaicite:6]{index=6}. Most recently, Dangel \textit{et al.}\ (2025) proposed a technique to further optimize Taylor-mode AD itself by *collapsing* derivative terms in the computation graph:contentReference[oaicite:7]{index=7}. This **Collapsed Taylor Mode** method algebraically combines intermediate derivative computations, requiring only a single pass that propagates summed derivative information. The result is a significant speed-up of Taylor-mode AD, outperforming even nested backpropagation in practice for computing PDE operators:contentReference[oaicite:8]{index=8}.
+
+Together, these advances motivate a dedicated repository to consolidate knowledge and provide implementations for the community. **Taylor Mode PINNs** is conceived as an open-source project where AI coding agents, researchers, and contributors can learn about and implement these cutting-edge techniques. We integrate insights from the four key papers – Taylor-mode AD for higher-order derivatives in JAX by Bettencourt \textit{et al.}\ (2019), KFAC for PINNs by Dangel \textit{et al.}\ (NeurIPS 2024):contentReference[oaicite:9]{index=9}:contentReference[oaicite:10]{index=10}, the Stochastic Taylor derivative method by Shi \textit{et al.}\ (NeurIPS 2024):contentReference[oaicite:11]{index=11}, and Collapsing Taylor Mode by Dangel \textit{et al.}\ (2025):contentReference[oaicite:12]{index=12} – and provide a hands-on learning environment. In this blueprint, we outline the repository structure, the contents of instructional Jupyter notebooks, the design of the source code modules (with a focus on Taylor-mode AD and Kronecker utilities), and the development practices to ensure reproducibility and extensibility.
+
+\section{Repository Structure}
+
+The repository is organized to facilitate learning and experimentation. Key directories include the Jupyter notebooks (which serve as step-by-step tutorials), the core Python package implementing Taylor-mode and Kronecker-aware algorithms, configuration files for reproducibility, and documentation. The high-level folder structure is as follows:
+
+\begin{verbatim}
+TaylorModePINNs/
+├── README.md
+├── environment.yml
+├── notebooks/
+│   ├── 01_introduction_to_taylor_mode.ipynb
+│   ├── 02_forward_vs_reverse_AD.ipynb
+│   ├── 03_high_order_derivatives.ipynb
+│   ├── 04_forward_laplacian_demo.ipynb
+│   ├── 05_randomized_taylor_mode.ipynb
+│   ├── 06_simple_PINN_example.ipynb
+│   ├── 07_weight_sharing_network.ipynb
+│   ├── 08_KFAC_implementation.ipynb
+│   ├── 09_collapsing_taylor_mode.ipynb
+│   └── 10_full_PDE_case_study.ipynb
+├── src/
+│   ├── taylor_mode/
+│   │   ├── __init__.py
+│   │   ├── jet.py
+│   │   ├── forward.py
+│   │   ├── randomize.py
+│   │   └── collapse.py
+│   ├── kron_utils/
+│   │   ├── __init__.py
+│   │   └── kfac.py
+│   ├── pinns/
+│   │   ├── __init__.py
+│   │   └── operators.py
+│   └── utils/
+│       └── __init__.py
+├── tests/
+│   ├── test_taylor_mode.py
+│   ├── test_kron_utils.py
+│   └── test_pinns.py
+├── docs/
+│   ├── conf.py
+│   ├── index.md or index.rst
+│   └── references.bib
+├── CITATION.cff
+└── .github/
+    └── workflows/
+        └── ci.yml
+\end{verbatim}
+
+**Notebooks:** The `notebooks/` directory contains at least 10 Jupyter notebooks, each focusing on a specific aspect of Taylor-mode AD or its application in PINNs. They are numbered to suggest a learning sequence, from basic concepts to advanced applications. Each notebook is self-contained with narrative, equations, and code exercises. The numbering (e.g., `01_introduction_to_taylor_mode.ipynb`) ensures the order is preserved when browsing on GitHub.
+
+**Source Code (`src/`):** The core library resides in `src/`. We adopt a package structure so that users can install it (e.g., via `pip install -e .`) for use in notebooks. Key sub-packages include:
+- `taylor_mode/`: Implements Taylor-mode AD routines. This includes:
+  - `jet.py`: data structures and functions for representing jets (truncated Taylor series) and performing forward propagation of derivatives.
+  - `forward.py`: high-level functions to compute forward derivatives of neural networks (e.g., a function to evaluate a network and all derivatives up to order $k$ at given inputs).
+  - `randomize.py`: functions for randomized Taylor-mode computations (e.g., applying random tangent directions to approximate high-dimensional derivative tensors, following the approach of Shi \textit{et al.} (2024)).
+  - `collapse.py`: an implementation of the collapsing technique by Dangel \textit{et al.}\ (2025) that optimizes the forward derivative computations by combining terms.
+- `kron_utils/`: Provides tools for Kronecker-factored operations:
+  - `kfac.py`: an implementation of the KFAC optimizer specialized for PINNs. This includes routines to compute layer-wise Kronecker factors (for weights and activations) from the extended Taylor-mode computation graph and an optimizer class `KFACOptimizer` that can be used in training loops as a drop-in replacement for, say, Adam. It will leverage the general KFAC formulation for networks with weight sharing:contentReference[oaicite:13]{index=13}.
+- `pinns/`: (Optional) Utilities specific to PINN applications:
+  - `operators.py`: definitions of common differential operators and PINN residuals. For example, functions that given a neural network $f_\theta(x)$, compute PDE residuals like $\mathcal{L}f$ for a PDE operator $\mathcal{L}$ (using functions from `taylor_mode` under the hood). This might include a generic routine to assemble a PINN loss from a PDE definition, initial/boundary conditions, etc., for use in examples.
+- `utils/`: General utilities (if needed). This could include helper functions for seeding random number generators, common math routines, or small tools to support testing and notebooks.
+
+**Configuration and Metadata:** At the repository root, `README.md` provides an overview and quickstart instructions. The `environment.yml` file specifies a Conda environment for reproducibility (see Section \ref{sec:reproducibility}). A `CITATION.cff` file is included to provide citation metadata for the repository, so researchers know how to cite this project.
+
+**Tests:** The `tests/` directory contains automated tests (using `pytest`) to ensure the correctness of core functionalities. For instance, `test_taylor_mode.py` might verify that the Taylor-mode derivatives for simple functions match finite-difference or analytic derivatives, `test_kron_utils.py` might check that KFAC's approximated curvature matches the true curvature on a small network to a certain degree, and so on. Continuous Integration will run these tests on each commit (see Section \ref{sec:ci}).
+
+**Documentation:** The `docs/` folder holds the source files for documentation. We plan to use Sphinx with MyST or reStructuredText (or MkDocs with Markdown) to build a documentation site (Section \ref{sec:docs}). This includes a `conf.py` configuration, a top-level `index` page, and possibly a bibliography file (`references.bib`) to manage citations of the academic papers within the docs.
+
+**CI/CD:** The `.github/workflows/` directory contains the configuration for GitHub Actions. In particular, `ci.yml` defines the Continuous Integration pipeline to install the environment, run tests, and build docs.
+
+Overall, the structure separates educational content (notebooks) from library code (`src/`), and both are tied together via tests and documentation, ensuring that the project is maintainable and scalable.
+
+\section{Jupyter Notebook Walkthroughs}
+\label{sec:notebooks}
+
+A core component of this repository is a sequence of Jupyter notebooks that provide a guided walkthrough of Taylor-mode AD and its application to PINNs. Each notebook is designed with specific learning goals and corresponds to certain sections of the key reference papers. They also include code cells where an AI agent (or a human developer) is expected to implement portions of the logic discussed. Below, we describe each notebook in detail, including its purpose, prerequisites, relevant paper sections, and implementation notes.
+
+\subsection{Notebook 1: Introduction to Taylor-Mode AD}
+\begin{description}
+  \item[\textbf{Goals:}] Introduce the basic idea of Taylor-mode automatic differentiation. This notebook establishes what Taylor-mode AD means, in contrast to standard forward-mode and reverse-mode AD. It walks through a simple example of computing derivatives of a scalar function using truncated Taylor series.
+  \item[\textbf{Dependencies:}] No special prerequisites beyond basic calculus and Python. Uses only standard libraries (NumPy) for illustration. No code from the `src/` package is required yet; this is a conceptual introduction.
+  \item[\textbf{Target Paper Sections:}] Background on Taylor-mode AD as described by Bettencourt \textit{et al.}\ (2019):contentReference[oaicite:14]{index=14}. We reference the idea of propagating higher-order derivatives through computational graphs.
+  \item[\textbf{Expected Implementation:}] The AI agent (or user) will implement a simple function that manually computes Taylor series coefficients. For example, given $f(x) = \sin(x)$, compute up to 4th-order derivative at $x=0$ by propagating the Taylor expansion. The notebook might provide a step-by-step breakdown (e.g., computing $f$, $f'$, $f''$ by hand vs using an automatic procedure). The agent should implement a routine to perform this propagation for an arbitrary user-defined function, illustrating how forward AD extends to higher orders.
+\end{description}
+
+\subsection{Notebook 2: Forward-Mode vs Reverse-Mode AD for PINNs}
+\begin{description}
+  \item[\textbf{Goals:}] Demonstrate the challenge of computing high-order derivatives using traditional reverse-mode AD (backpropagation) versus using forward-mode approaches. We use a toy neural network (e.g., a small Multi-Layer Perceptron, MLP) and a simple PDE (such as $u''(x) = \sin(x)$) to show how many derivative calls or graph traversals are needed with each method. The goal is to motivate Taylor-mode AD by highlighting the exponential cost of nested backpropagation.
+  \item[\textbf{Dependencies:}] Requires a basic neural network (which can be defined with a few lines of JAX or PyTorch). Uses the `autograd` or JAX's grad/jacfwd functions to compute derivatives for comparison. Might start using the `taylor_mode` module if it's ready for simple cases, or still keep it self-contained.
+  \item[\textbf{Target Paper Sections:}] Introduction of Dangel \textit{et al.}\ (2025) where they note nested reverse-mode scales poorly:contentReference[oaicite:15]{index=15}. Possibly Figure 1 of that paper (comparing forward vs backward for computing a Laplacian) as conceptual reference.
+  \item[\textbf{Expected Implementation:}] The agent will implement timing experiments or operation counts: e.g., manually nest reverse-mode (using \texttt{jax.grad} twice for second derivative) and compare with a forward-mode (using \texttt{jax.jacfwd} or our own Taylor-mode function) for computing a second-order derivative. The notebook should include code to measure performance (time or number of operations) and illustrate the difference. The agent might also implement a small utility to perform a second-order derivative via dual numbers or forward AD as an exercise.
+\end{description}
+
+\subsection{Notebook 3: High-Order Derivatives via Taylor Expansion}
+\begin{description}
+  \item[\textbf{Goals:}] Teach how Taylor-mode AD can compute high-order derivatives efficiently. This notebook builds on the concept by implementing a general procedure to get derivatives up to order $k$ of an MLP output with respect to its input in one forward pass. It will show the internal workings of propagating derivative information through each layer (product and chain rule extensions for Taylor coefficients).
+  \item[\textbf{Dependencies:}] This is the first notebook that leverages the library code in `src/taylor_mode`. It will use functions from `taylor_mode.jet` or `taylor_mode.forward`. We assume the agent has implemented or will implement a function like `forward_derivatives(network, x0, order)` which returns the value and all derivatives up to the given order.
+  \item[\textbf{Target Paper Sections:}] This corresponds to methodology sections of Bettencourt \textit{et al.}\ (2019) and the PINNs-specific adaptation in Wang \textit{et al.}\ (2022) (as cited by Jnini \textit{et al.}\ 2024). Essentially, it covers how to extend forward-mode AD to high dimensions. If the reference by Wang et al. (2022) introduced Taylor-mode for PINNs, that context is discussed here.
+  \item[\textbf{Expected Implementation:}] The AI agent is expected to implement the forward propagation of a jet through a single layer: e.g., given input jet (values of input and its derivatives up to $k$), compute the output jet for a dense layer $y = W x + b$ (where $W$ is weight matrix). This involves combining derivatives using the product rule. Similarly, for an activation function like $\tanh$ or $\sin$, the agent implements how to update all derivative orders (this may use pre-computed formulas or a recursive relation). The notebook then uses these building blocks (possibly via the `taylor_mode` library functions) to compute, for example, all derivatives up to 3rd order of a small network and compares them against finite differences or autograd for verification.
+\end{description}
+
+\subsection{Notebook 4: Forward Laplacian and PDE Operators}
+\begin{description}
+  \item[\textbf{Goals:}] Present a case study of computing a specific PDE operator (like the Laplacian $\Delta u = \sum_i \frac{\partial^2 u}{\partial x_i^2}$) on a neural network output using Taylor-mode AD. This notebook highlights the concept of the *forward Laplacian* – computing the Laplacian in one forward pass – which avoids nested second-order derivatives. It shows how Taylor-mode AD naturally produces the Laplacian (when taking second-order terms) and how this generalizes to other linear differential operators.
+  \item[\textbf{Dependencies:}] Uses `taylor_mode.forward` or a similar API to compute second-order derivatives. Possibly introduces `pinns.operators` for convenience (e.g., a function `laplacian(nn, x0)` that returns $\Delta nn(x0)$ and maybe first derivatives if needed). Could also use JAX's experimental higher-order AD (like the `jet` module) if instructive.
+  \item[\textbf{Target Paper Sections:}] References Dangel \textit{et al.}\ (2025) discussion on the forward Laplacian:contentReference[oaicite:16]{index=16} and Li \textit{et al.}\ (2019/2020) who developed specialized forward-mode schemes for the Laplacian. The connection between Taylor-mode and the forward Laplacian (mentioned in the Collapsing paper) is explained here.
+  \item[\textbf{Expected Implementation:}] The agent will implement a function to compute the Laplacian of a neural network output. For example, using Taylor-mode: propagate the jet up to second order and extract the trace of second derivatives. Alternatively, implement the Hutchinson's trick (randomized trace) as a naive approach and compare. The notebook may ask the agent to confirm that the Taylor-mode result (exact Laplacian) matches the numerical approximation or autograd's result. It could also involve extending the code to a *weighted Laplacian* to show how easy it is to adapt when one has all second derivatives available (just a linear combination of them). This exercise cements understanding of how Taylor-mode can compute complex operators in one pass.
+\end{description}
+
+\subsection{Notebook 5: Randomized Taylor-Mode for High Dimensions}
+\begin{description}
+  \item[\textbf{Goals:}] Explore the idea of randomizing Taylor-mode AD to handle very high-dimensional inputs or high-order derivatives without incurring a combinatorial explosion of terms. This notebook introduces the concept of using random projections to estimate quantities like the Laplacian or higher-order differential operators stochastically. It demonstrates the approach of Shi \textit{et al.}\ (2024) in a simplified setting.
+  \item[\textbf{Dependencies:}] Builds on the previous notebook. Uses `taylor_mode.randomize` module functions if available. Also uses `numpy` or `jax.random` for generating random vectors. May reuse the example PDE operator from Notebook 4.
+  \item[\textbf{Target Paper Sections:}] Based on Shi \textit{et al.}\ (2024), particularly their method of constructing input perturbations and using Taylor-mode on univariate sub-problems:contentReference[oaicite:17]{index=17}. Also touches on the Hutchinson estimator for trace of Hessian (which is a special case of randomization).
+  \item[\textbf{Expected Implementation:}] The agent should implement a routine that approximates a high-dimensional derivative. For instance, to approximate the Laplacian $\Delta u$, instead of summing second derivatives for each dimension $d$ (which is expensive if $d$ is large), generate $R$ random Gaussian vectors $v^{(r)}$ in input space and use Taylor-mode to compute second directional derivatives $v^{(r)\top} \nabla^2 u v^{(r)}$. Averaging these gives a Monte Carlo estimate of the trace (this is the Hutchinson method). The notebook will prompt implementing this random strategy and comparing its result and runtime with the exact result (from Notebook 4) for moderate $d$. This showcases how randomization yields huge computational gains in high dimensions:contentReference[oaicite:18]{index=18}. The AI agent is expected to integrate Taylor-mode AD with random sampling; for example, implementing a function `stochastic_laplacian(nn, x0, R)` that returns an approximate Laplacian using $R$ random projections.
+\end{description}
+
+\subsection{Notebook 6: A Simple PINN Example (Taylor-Mode in Action)}
+\begin{description}
+  \item[\textbf{Goals:}] Apply Taylor-mode AD to a basic PINN training scenario. In this notebook, we set up a simple PINN for an easy PDE (e.g., $u'(x) = \cos x$ or $u''(x) = -u(x)$ with known solution) and show how to compute the PINN loss efficiently using Taylor-mode. The aim is to illustrate a full training loop where derivatives for the PDE residual are obtained via our Taylor-mode library rather than standard autodiff.
+  \item[\textbf{Dependencies:}] Requires a deep learning framework (JAX or PyTorch) for defining and training the neural network. We assume the environment has JAX (for example) installed via the environment file. The notebook will use `taylor_mode.forward` to get derivatives. If using JAX, it might alternatively use JAX's jet API for demonstration (but likely our own implementation for clarity).
+  \item[\textbf{Target Paper Sections:}] This corresponds generally to applications of Taylor-mode AD in PINNs as seen in Wang \textit{et al.}\ (2022) and the experiments of Dangel \textit{et al.}\ (2024) where Taylor-mode was used to compute PINN losses:contentReference[oaicite:19]{index=19}. It doesn't map to a single section but rather demonstrates the end-to-end use of these techniques in training.
+  \item[\textbf{Expected Implementation:}] The AI agent will fill in code to define a simple neural network (e.g., a small MLP with one hidden layer), set up the PDE residual calculation using Taylor-mode. For example, implement a training loop where each iteration calls a function \texttt{pinns.compute\_loss(net, batch)} that uses Taylor-mode to obtain $u$, $u'$ (or $u''$ as required) and then computes the mean squared residual. The agent might also implement backpropagation for training as usual, since once the residuals are computed, standard optimizers can be used. The notebook will also highlight how easy it is to switch to a higher-order PDE (just by changing one parameter for derivative order) and still use the same code, underlining the generality of Taylor-mode AD for PINNs.
+\end{description}
+
+\subsection{Notebook 7: Weight-Sharing Network Representation}
+\begin{description}
+  \item[\textbf{Goals:}] Explain and demonstrate the concept of representing PDE derivative computations as a larger network with weight sharing. This is crucial for understanding how KFAC can be applied. The notebook will walk through constructing an expanded computation graph that includes not only the original network outputs but also the first and second derivatives as additional outputs, achieved by duplicating layers with shared weights.
+  \item[\textbf{Dependencies:}] Likely uses a network definition similar to Notebook 6. Will utilize either our own code or manual graph manipulation to create the expanded network. Possibly uses `jax.core` or `functorch` for duplicating operations, but more pedagogically, we might explicitly construct a Python class that wraps a given network and augments its forward pass to output derivatives.
+  \item[\textbf{Target Paper Sections:}] Key reference is Section 3 of Dangel \textit{et al.}\ (2024), where the authors describe interpreting the differential operator as a forward network with shared weights:contentReference[oaicite:20]{index=20}. Also relates to Figure 2 (if any) in that paper illustrating the expanded network architecture.
+  \item[\textbf{Expected Implementation:}] The agent will implement a simplified version of this concept. For example, given a one-hidden-layer network $f_\theta(x)$, manually construct a new network $\tilde{f}_\theta(x)$ that outputs $(f_\theta(x), \nabla_x f_\theta(x))$ by effectively having two parallel copies of each layer: one computing the function value and one computing the derivative (using the linearized operation from Notebook 3) but sharing the same weight matrices $\theta$. The notebook will have the agent code such a forward pass, possibly using functions from `taylor_mode.forward` to get derivative information without separate backprop. This construction can be validated by comparing $\tilde{f}_\theta$'s derivative output with autograd. This exercise readies the stage for applying KFAC, because once we have $\tilde{f}_\theta$, we can treat it like a normal network and compute its gradients w.r.t. weights for different outputs, which KFAC needs.
+\end{description}
+
+\subsection{Notebook 8: Implementing Kronecker-Factored Curvature (KFAC)}
+\begin{description}
+  \item[\textbf{Goals:}] Provide a step-by-step guide to implementing the KFAC optimizer for PINNs. This notebook ties together the weight-sharing network concept and shows how to compute the Kronecker factors (gradient covariance and activation covariance) layer by layer. It then demonstrates a training step using KFAC and compares it to a standard optimizer.
+  \item[\textbf{Dependencies:}] Uses the expanded network from Notebook 7 (either by reusing code or an object built there). Relies on `kron_utils.kfac` for core computations; the notebook might have some steps where the agent implements parts of KFAC if not fully provided by the library. Requires a working autograd for computing gradients of the loss w.r.t. network weights (for the curvature computations).
+  \item[\textbf{Target Paper Sections:}] Dangel \textit{et al.}\ (2024), specifically the methodology of Section 4 where the computation of Kronecker factors for PINNs is described:contentReference[oaicite:21]{index=21}. The notebook will paraphrase how one factor comes from the Jacobian of network outputs (or PDE residuals) w.r.t. weights, and the other from the gradient of the loss w.r.t. network outputs, and how Taylor-mode ensures the structure needed.
+  \item[\textbf{Expected Implementation:}] The agent will implement key steps of the KFAC algorithm:
+    \begin{itemize}
+      \item Computing the layer-wise activation covariance: for each layer (or each group of weights), compute $A = E[ aa^T ]$ where $a$ are the activations input to that layer (or here, extended to include derivative-related activations in the expanded network). The agent may fetch these from a forward pass.
+      \item Computing the layer-wise gradient covariance: similarly, get $G = E[ gg^T ]$ where $g$ are the gradients of the loss with respect to the layer's outputs (again considering all outputs including PDE residual terms).
+      \item Approximating the Fisher (or Gauss-Newton) matrix as $G \otimes A$ (Kronecker product). The agent might implement a function to update the inverse of this approximation efficiently by inverting $A$ and $G$ (which are smaller).
+      \item Using this to perform a weight update: e.g., solving $(G \otimes A) \, \Delta\theta \approx -\nabla_\theta L$ for the update $\Delta\theta$.
+    \end{itemize}
+  The notebook will likely guide these steps one by one, and then combine them in a simple training loop for a small PINN example. The agent might be asked to implement a single KFAC update given pre-computed $A$ and $G$ matrices for a layer. Finally, we compare training convergence of KFAC vs Adam on the example problem (showing KFAC reaching lower loss in fewer epochs, as in the paper:contentReference[oaicite:22]{index=22}).
+\end{description}
+
+\subsection{Notebook 9: Collapsing Taylor-Mode for Efficiency}
+\begin{description}
+  \item[\textbf{Goals:}] Illustrate the impact of the collapsing technique on Taylor-mode AD. The notebook will revisit a scenario from earlier (e.g., computing a PDE residual or a set of derivatives) and demonstrate the performance improvement when using the collapsed approach. It will explain conceptually how collapsing works (by combining derivative terms) and then verify that the results are numerically identical to the standard Taylor-mode.
+  \item[\textbf{Dependencies:}] Uses functionality from `taylor_mode.collapse` implemented according to Dangel \textit{et al.}\ (2025). It also uses a timer or profiler to measure performance. Could reuse the model and PDE from Notebook 4 or 6 for consistency.
+  \item[\textbf{Target Paper Sections:}] Dangel \textit{et al.}\ (2025) main results, particularly Section 3 where the collapsing algorithm is described and how it simply requires summing certain intermediate quantities:contentReference[oaicite:23]{index=23}. Also, references their experimental results that show speed-ups over vanilla Taylor-mode and backprop.
+  \item[\textbf{Expected Implementation:}] The agent will implement or utilize the collapsed Taylor-mode function. For example, if `forward.py` had a function `forward_derivatives`, the agent ensures `collapse.py` provides an optimized version `forward_derivatives_collapsed` that yields the same output. The notebook will ask the agent to verify correctness (e.g., compare derivative outputs from collapsed vs non-collapsed on random inputs) and then to measure runtime on a moderately sized network or higher-order derivative task. The agent may need to integrate a simple timing loop (using Python's time or `timeit`) to compare. We expect to see a tangible reduction in runtime (perhaps ~2x faster or more, as reported). The notebook should also encourage the agent to inspect the operations count or memory usage if possible, to appreciate the efficiency gains (collapsing avoids storing many intermediate terms, saving memory as well). This reinforces the practical value of the technique beyond theoretical interest.
+\end{description}
+
+\subsection{Notebook 10: Full Physics-Informed Learning Case Study}
+\begin{description}
+  \item[\textbf{Goals:}] Combine all the developed components in a comprehensive example. This final notebook could tackle a somewhat larger or more complex problem, such as a 2D PDE (e.g., Poisson's equation $\Delta u(x,y) = f(x,y)$) or a time-dependent problem, solved with a PINN. The goal is to show a workflow where Taylor-mode AD, possibly randomization, and even KFAC, are used together to solve a problem that would be infeasible with naive approaches.
+  \item[\textbf{Dependencies:}] Everything comes together here: the network definition, the `pinns.operators` for the PDE residual, the Taylor-mode derivative computation (possibly with collapsing and/or randomization if beneficial for the problem), and the KFAC optimizer as an option. This notebook will likely allow switching between different modes (first-order vs Taylor-mode, different optimizers) to compare.
+  \item[\textbf{Target Paper Sections:}] There may not be a single section, but we draw motivation from the dramatic example given by Shi \textit{et al.}\ (2024) where they solve a very high-dimensional problem (>1e6 dimensions):contentReference[oaicite:24]{index=24}. We likely cannot replicate that exactly here, but we illustrate the same principles on a smaller scale. Also, we reference results from Dangel \textit{et al.}\ (2024) showing improved training accuracy with second-order methods on PINNs.
+  \item[\textbf{Expected Implementation:}] The AI agent will orchestrate a PINN training using our library:
+  
+  - Define a neural network suitable for the problem (the agent might use a provided architecture or implement one).
+  - Set up the PINN loss using `pinns.operators` (which internally uses Taylor-mode to get derivatives).
+  - Choose an optimizer: perhaps first run with Adam (first-order) and then with KFAC (second-order) for comparison.
+  - If the problem is high-dimensional (e.g., 2D or 3D spatial domain), optionally enable the `randomize=True` flag in our derivative computation to use stochastic Taylor-mode (thus speeding up the derivative calculation) – the agent would have to pass an argument to use `randomize.py` functions internally.
+  - Train the model for a number of epochs, tracking training time and error.
+  
+  The notebook guides the agent to implement any missing pieces for this workflow. For instance, the agent might be asked to implement the loss function assembly (if not already in `pinns.operators`), or to integrate the KFAC optimizer into a training loop (computing the curvature matrices every $N$ steps, etc.). The final result can be to plot the learned solution vs the true solution, and report the training metrics. This comprehensive example serves as both a validation of the library and a template for users to tackle their own PDE problems with Taylor-mode PINNs.
+\end{description}
+
+\section{Source Code Breakdown and API}
+\label{sec:src}
+
+This section delves into the design of the source code in the `src/` directory. The aim is to describe the key modules, their public APIs, and how they relate to the concepts discussed in the notebooks. We also outline the testing strategy to ensure each component works as intended.
+
+\subsection{Taylor-Mode Module (\texttt{taylor\_mode/})}
+
+The `taylor_mode` package provides the core functionality for forward-mode automatic differentiation up to arbitrary order. It is the backbone of this project. Important components include:
+
+\begin{itemize}
+  \item \textbf{Jet Data Structure (\texttt{jet.py}):} We define a class (or lightweight struct) to represent the value of a function and its derivatives up to order $k$ at a point. For example, a \texttt{Jet} might have attributes like \texttt{jet.value} (the function value), \texttt{jet.deriv\_1} (first derivative vector), \texttt{jet.deriv\_2} (second derivatives, perhaps stored as a matrix or a vector for each second-order term), etc. Internally, we may store derivatives in a convenient format (e.g., a list of numpy arrays for each order).
+  \item \textbf{Forward Propagation Functions (\texttt{forward.py}):} This module contains functions that take a neural network (or any function represented by a composition of operations) and propagate a \texttt{Jet} through it. For example, a function \texttt{forward\_derivatives(f, x0, k)} will initialize a \texttt{Jet} for input $x0$ (with all necessary derivative seed values, typically 1 for first-order, 0 for others) and then apply $f$ operation by operation, updating the \texttt{Jet} at each step until we get the output jet containing $f(x0)$ and all derivatives up to order $k$. The public API might expose:
+  \begin{lstlisting}[language=Python, caption=Example usage of Taylor-mode API]
+from taylor_mode.forward import forward_derivatives
+y_val, y_derivs = forward_derivatives(my_network, x0, order=2)
+# y_val is f(x0); y_derivs[1] is grad f(x0); y_derivs[2] is Hessian (or its diagonal) etc.
+  \end{lstlisting}
+  The implementation handles common layer types (linear layers, activations) and can be extended for new operations.
+  \item \textbf{Randomized Derivative Computations (\texttt{randomize.py}):} This module provides utilities to randomize the computation for efficiency. One key function could be \texttt{randomized_derivative(f, x0, order, R)} which computes an estimate of a high-order derivative (like the trace of the Hessian) by sampling $R$ random directions as described in Notebook 5. It uses \texttt{forward.py} internally for each random projection. Another function might generate Gaussian random vectors of appropriate dimension (using NumPy or JAX) to feed into those projections.
+  \item \textbf{Collapsed Taylor Computation (\texttt{collapse.py}):} This contains an optimized version of the forward propagation. The logic here follows Dangel et al.'s algorithm: instead of propagating full high-order information, propagate aggregated quantities. Implementation-wise, this might involve modifying \texttt{forward\_derivatives} to accumulate certain terms on the fly. The module might expose \texttt{forward_derivatives\_collapsed} with the same signature as the normal version, or a boolean flag in the regular function to turn collapsing on.
+\end{itemize}
+
+The public API of `taylor_mode` thus includes functions like \texttt{forward\_derivatives}, \texttt{randomized\_laplacian} (for convenience, perhaps), and classes like \texttt{Jet} if needed by users. We strive to keep the interface simple: e.g., a user can call one function to get what they need (value and derivatives) without worrying about the underlying details, unless they want to.
+
+**Testing Strategy:** For `taylor_mode`, tests will focus on correctness of derivatives. We will create simple test functions (like polynomials, $\sin x$, etc.) where derivatives are known, and compare the output of our functions to known values. We'll also test multi-dimensional cases (e.g., $f(x,y) = x^2 + xy$ and verify mixed partials). Randomized methods will be tested for unbiasedness (running multiple times to see if the expectation matches true values within tolerance). Collapsing implementation will be tested by comparing its output to the non-collapsed version on random inputs to ensure they match exactly.
+
+\subsection{Kronecker Utilities (\texttt{kron\_utils/})}
+
+The `kron_utils` package is primarily concerned with the KFAC optimizer and possibly related approximations that exploit Kronecker-product structure. The highlight is:
+
+- \textbf{KFAC Optimizer (\texttt{kfac.py}):} We implement a class \texttt{KFACOptimizer} that wraps a normal optimizer (like SGD) but with additional methods to compute and apply the Fisher curvature approximation. The class will:
+  \begin{itemize}
+    \item Precompute Kronecker factors for each layer of the neural network. This requires hooking into the forward and backward passes. Since our context is PINNs, the forward pass is augmented via Taylor-mode to produce PDE residuals. We then take gradients w.r.t. weights (which involve those residuals) to get the quantities needed for curvature. The code might use our expanded network approach implicitly: e.g., compute the Jacobian of network outputs w.r.t. weights ($J$) and the gradient of the loss w.r.t. outputs ($g$), then form $A = E[J^T J]$ and $G = E[gg^T]$. This likely uses autograd for $J$ and $g$ on a mini-batch of data.
+    \item Maintain moving averages of $A$ and $G$ for stability (common in KFAC implementations).
+    \item Compute the update by inverting $A$ and $G$ (with damping for numerical stability) and then multiplying by the gradient to get a natural gradient direction.
+    \item Step the weights accordingly.
+  \end{itemize}
+  The user-facing API might look like:
+  \begin{lstlisting}[language=Python]
+optimizer = KFACOptimizer(net, lr=1e-3, damping=1e-2)
+for batch in data:
+    loss = pinns.loss(net, batch)
+    optimizer.zero_grad()
+    loss.backward()        # compute gradients
+    optimizer.step()       # KFAC step uses gradients and curvature
+\end{lstlisting}
+  Where \texttt{pinns.loss} internally uses Taylor-mode to evaluate the PDE residuals. Our KFAC implementation will intercept the gradient info and use Kronecker factorization before updating.
+  
+- We may also include helper functions in \texttt{kfac.py} for computing Kronecker products or for smaller matrix algebra tasks (like eigenvalue regularization of the factors).
+
+**Testing Strategy:** Testing KFAC is more involved, but we can do the following:
+  - Test that for a simple network and quadratic loss, one step of KFAC (with full data) equals the result of an explicit natural gradient step. For example, a single-layer network on a mean-squared error loss has an analytic Fisher which we can compute directly; we ensure our code's $\Delta \theta$ matches that.
+  - Ensure that the shapes of $A$ and $G$ match expectations (e.g., if a layer has dimensions $a \times b$, $A$ should be $a \times a$, $G$ should be $b \times b$).
+  - Test that the weight sharing is handled: for a network where two outputs share weights (like our expanded network), verify that KFAC still computes factors correctly without duplication or omission. This can be done by constructing a tiny example of a weight-sharing network and comparing the factor computation using a brute-force approach versus our code.
+  
+Given the complexity, our tests will likely use small networks (one or two layers) and possibly fix random seeds to get deterministic results for comparisons.
+
+\subsection{PINNs Utilities (\texttt{pinns/})}
+
+The `pinns` module is a convenience library for setting up physics-informed problems. While not strictly necessary (users could write their own loss functions), it helps to have a standardized way to compute PDE residuals using Taylor-mode AD.
+
+- \textbf{Operators (\texttt{operators.py}):} This might include functions like \texttt{laplacian(net, x)} which returns the Laplacian of network $net$ at point $x$, using `taylor_mode.forward` internally to get second derivatives. Similarly, a generic \texttt{apply\_operator(net, x, operator)} where \texttt{operator} is a specification of a differential operator (perhaps an object that knows how to pick certain derivative components from a Jet). We can define common operators: gradient, divergence, Laplacian, etc.
+- \textbf{Loss Construction:} A function \texttt{pinn\_loss(net, X\_res, X\_bcs)} that given a set of collocation points in the domain and maybe boundary points, computes the total PINN loss (PDE residual MSE + boundary condition MSE). This function would use the operators to get residuals at $X_{res}$, compare with zero (or known forcing term), and likewise enforce initial/boundary conditions. This simplifies notebooks by providing a one-call loss computation.
+
+**Testing Strategy:** We will test `pinns` operators on simple known functions. For example, if $u(x,y) = \sin x \cos y$, we know $\Delta u = -2 \sin x \cos y$; we can check that \texttt{laplacian(net, x)} (with net approximating $u$ or even exactly $u$ if we instantiate net to represent that function) returns the expected result. For \texttt{pinn\_loss}, we could test on a manufactured solution scenario where the PDE is satisfied by a known $u$ and see that the loss is near zero.
+
+\subsection{Integration and Design Considerations}
+
+The interplay between these modules is important:
+- The \texttt{pinns} module uses \texttt{taylor\_mode} heavily under the hood.
+- The \texttt{kron\_utils} module expects that we have set up the network in a way (possibly via \texttt{pinns.operators} or the expanded network trick) so that computing gradients yields meaningful Kronecker factors. Our design is to hide as much complexity as possible: a user training a PINN with KFAC should ideally just swap their optimizer to KFAC and not worry about the mathematics; our library handles it.
+
+We also emphasize that all public functions and classes are documented (docstrings with usage examples) so that they can be auto-included in documentation. The APIs are designed to be general (not tied to a specific PDE) so that contributors can reuse them for new equations.
+
+\section{Reproducibility and Continuous Integration}
+\label{sec:ci}
+
+To ensure that results and experiments in this repository are reproducible, and that contributions do not break existing functionality, we have set up a robust reproducibility and Continuous Integration (CI) strategy.
+
+\subsection{Conda Environment and Dependencies}
+
+We provide an environment specification (`environment.yml`) that lists all required dependencies with fixed versions. This allows anyone to recreate the software environment in which the notebooks and code were developed. Using Conda (via \texttt{conda env create -f environment.yml}) ensures consistency across different machines and platforms. An example of the environment file is shown below:
+
+\begin{lstlisting}[language=Yaml, caption=environment.yml (conda environment)]
+name: taylor-mode-pinns
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy=1.24
+  - jax=0.4.13        # JAX for high-order AD support
+  - jaxlib=0.4.13     # JAX GPU support if available
+  - pytorch=2.0       # PyTorch (if used for models or comparison)
+  - matplotlib=3.7    # for plotting results in notebooks
+  - pytest=7.4        # for running tests
+  - sphinx=5.3        # for documentation
+  - myst-parser=1.0   # if using MyST markdown for Sphinx
+  - sphinxcontrib-bibtex=2.5  # to manage citations in docs
+  - black=23.3        # code formatter (for contributors)
+\end{lstlisting}
+
+We include both JAX and PyTorch in the environment to give flexibility (some notebooks might use JAX for convenience in Taylor-mode, while others could use PyTorch to illustrate broader applicability). If the project solidifies on one framework, the environment can be trimmed accordingly. The environment also pins specific versions to avoid unexpected changes when the environment is updated. 
+
+For GPU usage, appropriate CUDA toolkit versions would be included or instructions provided (for example, JAX and PyTorch have separate GPU versions). In the interest of simplicity, we might initially target CPU execution in notebooks (which is sufficient for the educational examples) and ensure all code can run without a GPU.
+
+To help with exact reproducibility of results in notebooks (where randomness might be involved, e.g., in randomized Taylor mode or weight initialization), we set random seeds in each notebook. We also recommend using deterministic flags if available (for instance, forcing single-thread computations or disabling nondeterministic GPU ops in PyTorch) when comparing performance metrics.
+
+\subsection{Continuous Integration (CI) with GitHub Actions}
+
+We use GitHub Actions to automatically test and validate the project on each commit and pull request. The CI workflow (`.github/workflows/ci.yml`) covers the following:
+
+- **Environment Setup:** The workflow uses the Conda setup action to create the environment from `environment.yml` on a Linux runner. This ensures the tests run in the same environment as developers use.
+- **Testing:** We run all test files with `pytest`. The test suite covers unit tests for `taylor_mode`, `kron_utils`, `pinns` modules as described earlier. We aim for a high coverage, especially for mathematical correctness of derivatives.
+- **Notebook Execution (Smoke Tests):** Optionally, the CI can attempt to run certain notebooks to catch any runtime errors or API mismatches. We won't run all heavy computations in CI (to keep it fast), but we might run the first few notebooks or a subset with a flag for quick execution (for example, using fewer epochs or smaller networks in CI mode).
+- **Linting and Formatting:** The workflow can include a lint step (using a tool like \texttt{flake8} or \texttt{pylint}) and enforce code formatting with \texttt{black}. For example, CI will fail if the code is not formatted according to Black, prompting contributors to format their code properly.
+- **Documentation Build:** Another job in the workflow could build the documentation (using Sphinx or MkDocs) to ensure that the docs compile without errors (and possibly to deploy them, although deployment might be separate or manual). This catches issues like broken references in docs early.
+
+A simplified CI configuration might look like:
+
+\begin{lstlisting}[language=Yaml, caption=.github/workflows/ci.yml (simplified)]
+name: CI
+on: [push, pull_request]
+jobs:
+  build-test-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          environment-file: environment.yml
+          activate-environment: taylor-mode-pinns
+      - name: Run Tests
+        run: pytest -q
+      - name: Lint Code
+        run: black --check .
+      - name: Build Docs
+        run: |
+          sphinx-build -b html docs docs/_build/html
+\end{lstlisting}
+
+In this example, we install dependencies, run tests, check formatting, and attempt to build documentation. We use the \texttt{-q} flag for pytest to keep logs succinct. If any step fails, the entire workflow is marked as failed, alerting maintainers to address the issue.
+
+**Continuous **Integration** ensures that the repository remains reproducible and that all examples continue to work.** By using a consistent environment and running tests on each change, we catch issues like an update that accidentally breaks the Taylor-mode calculations or a change in one module that isn't reflected in a notebook. This is especially important for a teaching repository, as users (and AI agents) should find the project in a working state at all times.
+
+Furthermore, to encourage reproducibility, we might integrate badges in the README (like build status, docs status). We will also consider publishing the environment with a DOI or on a platform like Zenodo once the project is mature, so the exact environment and code can be referenced in academic contexts.
+
+\section{Documentation and Citations}
+\label{sec:docs}
+
+Good documentation is crucial for an educational repository. We plan to create a documentation website that complements the notebooks and code. The documentation will serve as a reference guide and contain additional background for those who want a deeper understanding or prefer a textual format.
+
+\subsection{Documentation Framework}
+
+We can use **Sphinx** to build the docs, taking advantage of its extensive features for technical documentation, or **MkDocs** for a simpler Markdown-based approach. Here, we outline a Sphinx-based setup (the approach with MkDocs would be analogous, using Markdown files).
+
+- The docs will be written primarily in Markdown (via MyST parser) or reStructuredText. The top-level `index.md` (or `index.rst`) will introduce the project and link to various sections.
+- We will include sections such as:
+  - **Introduction:** Overview of Taylor-mode PINNs (a condensed, narrative form of the Project Overview, possibly with additional context or figures).
+  - **Installation:** How to install the package or set up the environment.
+  - **User Guide:** Walkthrough on how to use the library. This might mirror the notebooks' content but in a continuous text form. For instance, a page on Taylor-mode AD usage, a page on using the PINNs utilities, etc.
+  - **Examples:** This section can link to rendered notebooks (we can use tools to convert notebooks to documentation pages, or simply link to the GitHub notebooks). We may also include static plots or outputs from the notebooks to show results.
+  - **API Reference:** Using Sphinx's autodoc, we will generate documentation for the Python API of `taylor_mode`, `kron_utils`, and others. Each public function/class will appear here with its docstring. This is valuable for contributors and advanced users.
+  - **References:** A dedicated page or appendix listing the key references (the four papers and possibly others cited in text).
+
+The Sphinx config (`docs/conf.py`) will enable the \texttt{autodoc} extension (to extract docstrings) and \texttt{sphinxcontrib.bibtex} (to manage references). The bibliography file `references.bib` will contain BibTeX entries for the four key papers and any additional sources cited. Throughout the docs text, we can use citation keys to reference these (for example, in the introduction: "as shown by \cite{Dangel2024} in their KFAC-PINNs work").
+
+For MkDocs, an alternative approach: use \texttt{mkdocs.yml} to configure, and perhaps use the \texttt{mkdocstrings} plugin for API docs. Citations in MkDocs (Markdown) are a bit less straightforward, but we could manually hyperlink to a references section or use a plugin for citations.
+
+\subsection{Including References and Citation Metadata}
+
+In the documentation and in this blueprint, we ensure all acronyms and technical terms are well-defined. The first time we mention an acronym like AD (Automatic Differentiation), PINNs (Physics-Informed Neural Networks), KFAC (Kronecker-Factored Approximate Curvature), or KFAC's related terms, we spell them out. This practice will continue in the docs.
+
+All references to academic papers in the docs will be cited properly. In this blueprint (and similarly in docs), we've used bracketed numbers to cite sources (e.g., [1], [2]). In the final documentation, these could appear as hyperlinked citations, either numbered or author-year depending on style. For example, a sentence in the docs might read: "The idea of Taylor-mode AD was introduced to the ML community by Bettencourt \textit{et al.}\ (2019)\cite{Bettencourt2019}," and the references section will list the full citation. 
+
+We also include a CITATION.cff file at the root of the repository. This file provides metadata for how to cite the repository itself (e.g., title, authors, DOI if applicable, URL). GitHub can parse this to show a "Cite this repository" button. We'll list "Fahiz Baba-Yara" as the author and possibly the key contributors or maintainers, and include the year and a description. This encourages academic referencing of the tool alongside the concept references.
+
+**Versioning and Releasing:** For completeness, we plan to version the library (using semantic versioning). Each version's documentation will keep its own references. If significant new research is added (e.g., a new paper implemented), the docs and CITATION will be updated to reflect that.
+
+\subsection{Figures and Diagrams}
+
+Where helpful, we will include diagrams in the documentation. For example, an architecture diagram showing the expanded network for Taylor-mode (as in KFAC paper) could be included. We'll use the \texttt{graphicx} package to include such images in LaTeX documentation if needed, and in Sphinx/MkDocs we'd keep image files under `docs/` (or generate them using scripts). Since this blueprint document itself is in LaTeX, we ensure the ability to include figures by having \texttt{graphicx} loaded. In practice, the actual images (if from the papers) would need to be redrawn or properly credited due to license, but we can create our own schematic illustrations if necessary.
+
+\section{Contributing and Extending the Repository}
+\label{sec:conclusion}
+
+This concluding section provides guidelines for future contributors (human or AI) and advice on how to add new research findings into the repository.
+
+**Contributor Guidelines:**
+We welcome contributions via pull requests. Contributors should follow these guidelines:
+\begin{itemize}
+  \item **Code Style:** Adhere to PEP 8 style guide for Python code. We use Black for formatting; please format your code before submission (CI will check this). Also, include type hints for new functions when possible to improve clarity.
+  \item **Documentation:** Any new feature or module should come with appropriate documentation. Update or add docstrings in the code and, if significant, add a section in the docs or an example notebook demonstrating the feature. For example, if adding a new module for a "Hessian-free optimizer," provide an explanation in the documentation and perhaps a new notebook.
+  \item **Testing:** All new code must be covered by tests. If you add a function in `taylor_mode`, add corresponding cases in `test_taylor_mode.py`. Tests should be deterministic and check both correctness and edge cases (e.g., check behavior at extreme values or with unusual input shapes).
+  \item **Commit Messages:** Use descriptive commit messages. If the contribution addresses an open issue, include references (e.g., "Fixes \#10: Implemented support for third-order derivatives in forward\_derivatives").
+  \item **Discussions and Reviews:** We encourage opening an issue to discuss major changes or additions before implementation, especially for larger features or research directions. Maintainers and the community can provide feedback to ensure consistency with the project goals.
+\end{itemize}
+
+**Extending to New Research Modules:**
+The field of physics-informed learning and high-order AD is active. We anticipate new techniques (e.g., Hessian-free methods, alternative curvature approximations, improved randomization schemes, domain-specific optimizations, etc.). To add a new research module:
+\begin{enumerate}
+  \item **Plan the Integration:** Determine where the new method fits. Is it an extension of Taylor-mode AD (then maybe in `taylor_mode/`), or a new optimizer (maybe a new sub-package like `optim/`), or a new type of example (which could just be an additional notebook and perhaps minor code)? For instance, if a new paper introduces a "Neural Tangent Kernel approach for PINNs," that might not fit under Taylor-mode but could be a separate feature. However, a "higher-order adjoint method" might extend our `taylor_mode` offerings.
+  \item **Follow Repository Structure:** Create a module under `src/` with a clear name. Write it in a similar style to existing modules. If it’s large, you can make a sub-package (like we did with `taylor_mode` and `kron_utils`). Include an `__init__.py` to expose key functions.
+  \item **Notebook Demonstration:** Add a new Jupyter notebook (e.g., `11_new_method_demo.ipynb`) illustrating the concept and usage of the new module in context. Keep the style consistent: introduction, explanation, some math if needed, and an implementation exercise. This is important as the notebooks are the primary learning tools.
+  \item **Documentation and Citation:** Update the documentation to mention the new module. If it’s based on a paper, add that paper to the references (both in the docs and maybe in this blueprint’s reference list if we update it). Ensure to cite it where appropriate. If the method is substantially different, you might add a section in the docs for "Extended Topics" or similar.
+  \item **Testing:** Write tests for the new code. If it's not straightforward to test (e.g., if it’s stochastic or requires large computation), at least test parts of it or deterministic facets. Possibly add a small example in tests to verify it runs (like a smoke test).
+\end{enumerate}
+
+By following these steps, the repository can grow in a controlled and reliable way. We aim to maintain the educational quality while keeping the codebase clean and coherent.
+
+Finally, we encourage contributors to share not just code, but insights. If a new module is added, perhaps also add a short write-up in the repository's Wiki or as a tutorial explaining the intuition. The goal of Taylor Mode PINNs is to be the go-to resource for anyone looking to understand or implement advanced differentiation techniques in physics-informed learning, and that is only possible through a collaborative, well-documented effort.
+
+\vfill
+\begin{center}
+\textit{--- End of Blueprint Document ---}
+\end{center}
+
+\begin{thebibliography}{99}
+\bibitem{Bettencourt2019} Bettencourt, J., Johnson, M. J., \& Duvenaud, D. (2019). \textit{Taylor-mode automatic differentiation for higher-order derivatives in JAX}. In \textit{NeurIPS Workshop on Program Transformations for Machine Learning}.
+\bibitem{Dangel2024} Dangel, F., M{\"u}ller, J., \& Zeinhofer, M. (2024). \textit{Kronecker-Factored Approximate Curvature for Physics-Informed Neural Networks}. Advances in Neural Information Processing Systems 2024. (arXiv:2405.15603):contentReference[oaicite:25]{index=25}:contentReference[oaicite:26]{index=26}
+\bibitem{Shi2024} Shi, Z., Hu, Z., Lin, M., \& Kawaguchi, K. (2024). \textit{Stochastic Taylor Derivative Estimator: Efficient amortization for arbitrary differential operators}. Advances in Neural Information Processing Systems 2024 (Oral). (OpenReview: J2wI2rCG2u):contentReference[oaicite:27]{index=27}:contentReference[oaicite:28]{index=28}
+\bibitem{Dangel2025} Dangel, F., Siebert, T., Zeinhofer, M., \& Walther, A. (2025). \textit{Collapsing Taylor Mode Automatic Differentiation}. arXiv preprint arXiv:2505.13644:contentReference[oaicite:29]{index=29}.
+\end{thebibliography}
+
+\end{document}
