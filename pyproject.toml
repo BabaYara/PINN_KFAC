@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "taylor-pinns"
+version = "0.1.0"
+description = "Taylor-mode AD and KFAC utilities for Physics-Informed Neural Networks"
+authors = [{name = "Fahiz Baba-Yara"}]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "jax",
+    "jaxlib",
+    "numpy"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
