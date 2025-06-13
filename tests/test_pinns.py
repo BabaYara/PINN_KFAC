@@ -31,3 +31,12 @@ def test_poisson_residual_zero_for_exact_solution():
     x = jnp.linspace(0.0, jnp.pi, 5).reshape(-1, 1)
     res = poisson_residual(model, x, forcing)
     assert jnp.allclose(res, 0.0)
+
+
+def test_heat_residual_zero_for_exact_solution():
+    from pinns import heat_residual
+
+    model = lambda xt: jnp.exp(-xt[1]) * jnp.sin(xt[0])
+    xt = jnp.array([[0.1, 0.2], [0.3, 0.0]])
+    res = heat_residual(model, xt)
+    assert jnp.allclose(res, 0.0, atol=1e-6)
