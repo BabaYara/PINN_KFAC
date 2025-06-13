@@ -20,7 +20,8 @@ available.
 ## Example
 
 Several notebooks in the `notebooks/` folder demonstrate the library.
-Run `08_KFAC_implementation.ipynb` to see a very small KFAC step.
+`08_KFAC_implementation.ipynb` shows a short linear-regression example using
+the `KFACOptimizer` implemented in this package.
 
 ## Project Plan
 
