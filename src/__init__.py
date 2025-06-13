@@ -9,6 +9,7 @@ from .taylor_mode import (
 )
 from .kron_utils import KFACOptimizer
 from .pinns import gradient, laplacian, pinn_loss
+from .networks import init_mlp, mlp_apply
 
 __all__ = [
     "Jet",
@@ -20,4 +21,6 @@ __all__ = [
     "KFACOptimizer",
     "gradient",
     "laplacian",
+    "init_mlp",
+    "mlp_apply",
 ]
