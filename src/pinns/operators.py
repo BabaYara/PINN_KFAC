@@ -83,3 +83,41 @@ def heat_residual(
         return res
 
     return jax.vmap(single_residual)(xt)
+
+
+def burgers_residual(
+    model: Callable[[jnp.ndarray], jnp.ndarray],
+    xt: jnp.ndarray,
+    viscosity: float = 0.01,
+    forcing_fn: Callable[[jnp.ndarray], jnp.ndarray] | None = None,
+) -> jnp.ndarray:
+    """Return the 1D Burgers residual ``u_t + u u_x - ν u_xx - f``.
+
+    Parameters
+    ----------
+    model : Callable
+        Network mapping ``(x, t)`` to ``u(x, t)``.
+    xt : jnp.ndarray
+        Points ``(batch, 2)`` where the residual is evaluated.
+    viscosity : float, optional
+        Viscosity coefficient ``ν``. Defaults to ``0.01``.
+    forcing_fn : Callable, optional
+        Optional forcing term ``f(x, t)``. If ``None``, assumes zero forcing.
+
+    Returns
+    -------
+    jnp.ndarray
+        Residual values at each input ``(x, t)``.
+    """
+
+    def single_residual(z: jnp.ndarray) -> jnp.ndarray:
+        val, derivs = forward_derivatives(lambda y: model(y).squeeze(), z, order=2)
+        u = val
+        grad = derivs[1]
+        hess = derivs[2]
+        res = grad[1] + u * grad[0] - viscosity * hess[0, 0]
+        if forcing_fn is not None:
+            res = res - forcing_fn(z)
+        return res
+
+    return jax.vmap(single_residual)(xt)
