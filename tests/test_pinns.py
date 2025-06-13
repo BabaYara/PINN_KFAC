@@ -40,3 +40,12 @@ def test_heat_residual_zero_for_exact_solution():
     xt = jnp.array([[0.1, 0.2], [0.3, 0.0]])
     res = heat_residual(model, xt)
     assert jnp.allclose(res, 0.0, atol=1e-6)
+
+
+def test_burgers_residual_zero_for_constant_solution():
+    from pinns.operators import burgers_residual
+
+    model = lambda xt: jnp.array(0.0)
+    xt = jnp.array([[0.0, 0.0], [0.5, 0.2]])
+    res = burgers_residual(model, xt)
+    assert jnp.allclose(res, 0.0)

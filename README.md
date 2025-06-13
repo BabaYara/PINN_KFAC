@@ -20,7 +20,8 @@ for quick experiments with KFAC training.  The `pinns.operators` submodule
 includes helpers like `poisson_residual` for assembling common PDE losses.
 
 The operators module now also provides `heat_residual` for the 1D heat
-equation, making it easy to experiment with time-dependent problems.
+equation, and `burgers_residual` for Burgers' equation, making it easy
+to experiment with time-dependent problems.
 
 ## Example
 
@@ -34,3 +35,5 @@ Several notebooks in the `notebooks/` folder demonstrate the library.
 the new convenience function.
 `13_heat_residual_demo.ipynb` shows how to evaluate the heat equation residual
 using `heat_residual`.
+`14_burgers_residual_demo.ipynb` illustrates evaluating the Burgers equation
+residual with `burgers_residual`.
