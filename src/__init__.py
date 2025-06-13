@@ -8,7 +8,7 @@ from .taylor_mode import (
     forward_derivatives_collapsed,
 )
 from .kron_utils import KFACOptimizer
-from .pinns import gradient, laplacian, pinn_loss
+from .pinns import gradient, laplacian, pinn_loss, train_pinn
 from .networks import init_mlp, mlp_apply
 
 __all__ = [
@@ -23,4 +23,5 @@ __all__ = [
     "laplacian",
     "init_mlp",
     "mlp_apply",
+    "train_pinn",
 ]
