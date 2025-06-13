@@ -15,7 +15,8 @@ pip install -e .
 ```
 
 This will make the `taylor_mode`, `kron_utils`, `networks`, and `pinns` modules
-available.
+available. The `pinns` module now also exposes a simple `train_pinn` routine
+for quick experiments with KFAC training.
 
 ## Example
 
@@ -24,3 +25,4 @@ Several notebooks in the `notebooks/` folder demonstrate the library.
 `04_PINN_loss_demo.ipynb` shows building a simple Poisson PINN using `pinn_loss`.
 `08_KFAC_implementation.ipynb` shows a short linear-regression example using the `KFACOptimizer`.
 `10_pinn_with_kfac.ipynb` demonstrates training a tiny PINN using the KFAC optimizer and the simple MLP utilities from `networks`.
+`11_kfac_training.ipynb` shows the `train_pinn` helper in action.
