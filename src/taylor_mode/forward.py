@@ -29,3 +29,8 @@ def forward_derivatives(
         derivs[n] = cur_fn(x)
 
     return value, derivs
+
+def hessian(f: Callable[[jnp.ndarray], jnp.ndarray], x: jnp.ndarray) -> jnp.ndarray:
+    """Convenience wrapper to return the Hessian matrix of ``f`` at ``x``."""
+    _, derivs = forward_derivatives(f, x, order=2)
+    return derivs[2]

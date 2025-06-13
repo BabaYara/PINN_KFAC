@@ -3,6 +3,7 @@
 from .taylor_mode import (
     Jet,
     forward_derivatives,
+    hessian,
     stochastic_laplacian,
     forward_derivatives_collapsed,
 )
@@ -12,6 +13,7 @@ from .pinns import gradient, laplacian, pinn_loss
 __all__ = [
     "Jet",
     "forward_derivatives",
+    "hessian",
     "pinn_loss",
     "stochastic_laplacian",
     "forward_derivatives_collapsed",
