@@ -19,6 +19,26 @@ def gradient(f: Callable[[jnp.ndarray], jnp.ndarray], x: jnp.ndarray) -> jnp.nda
     return derivs[1]
 
 
+def divergence(f: Callable[[jnp.ndarray], jnp.ndarray], x: jnp.ndarray) -> jnp.ndarray:
+    """Return the divergence of a vector field ``f`` at ``x``.
+
+    Parameters
+    ----------
+    f : Callable
+        Function mapping inputs ``x`` to a vector output ``f(x)``.
+    x : jnp.ndarray
+        Point at which the divergence is computed.
+
+    Returns
+    -------
+    jnp.ndarray
+        Scalar divergence value ``trace(J_f(x))``.
+    """
+
+    jac = jax.jacfwd(f)(x)
+    return jnp.trace(jac)
+
+
 def poisson_residual(
     model: Callable[[jnp.ndarray], jnp.ndarray],
     x: jnp.ndarray,

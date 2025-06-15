@@ -1,5 +1,5 @@
 import jax.numpy as jnp
-from pinns import gradient, laplacian
+from pinns import gradient, laplacian, divergence
 from pinns.operators import poisson_residual
 
 
@@ -10,6 +10,13 @@ def test_gradient_and_laplacian():
     lap = laplacian(f, x0)
     assert jnp.allclose(grad, 1.0)
     assert jnp.allclose(lap, 0.0)
+
+
+def test_divergence_simple_linear_field():
+    f = lambda x: jnp.stack([2 * x[0], x[0] + x[1]])
+    x0 = jnp.array([1.0, 2.0])
+    div = divergence(f, x0)
+    assert jnp.allclose(div, 3.0)
 
 
 def test_pinn_loss_zero_for_exact_solution():

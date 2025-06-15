@@ -17,7 +17,8 @@ pip install -e .
 This will make the `taylor_mode`, `kron_utils`, `networks`, and `pinns` modules
 available. The `pinns` module now also exposes a simple `train_pinn` routine
 for quick experiments with KFAC training.  The `pinns.operators` submodule
-includes helpers like `poisson_residual` for assembling common PDE losses.
+includes helpers like `poisson_residual` for assembling common PDE losses,
+as well as convenience functions such as `divergence`.
 
 The operators module now also provides `heat_residual` for the 1D heat
 equation, and `burgers_residual` for Burgers' equation, making it easy
