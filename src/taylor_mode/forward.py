@@ -30,7 +30,38 @@ def forward_derivatives(
 
     return value, derivs
 
+
 def hessian(f: Callable[[jnp.ndarray], jnp.ndarray], x: jnp.ndarray) -> jnp.ndarray:
     """Convenience wrapper to return the Hessian matrix of ``f`` at ``x``."""
     _, derivs = forward_derivatives(f, x, order=2)
     return derivs[2]
+
+
+def taylor_series_coefficients(
+    f: Callable[[jnp.ndarray], jnp.ndarray],
+    x: jnp.ndarray,
+    order: int,
+) -> list[jnp.ndarray]:
+    """Return ``f`` and its derivatives up to ``order`` at ``x``.
+
+    Parameters
+    ----------
+    f : Callable
+        Scalar-valued function to differentiate.
+    x : jnp.ndarray
+        Point of evaluation.
+    order : int
+        Highest derivative order to compute.
+
+    Returns
+    -------
+    list of jnp.ndarray
+        ``[f(x), f'(x), ..., f^(order)(x)]``.
+    """
+
+    coeffs = []
+    g = f
+    for _ in range(order + 1):
+        coeffs.append(g(x))
+        g = jax.grad(g)
+    return coeffs
