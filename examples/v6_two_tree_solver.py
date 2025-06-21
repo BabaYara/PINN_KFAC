@@ -1,48 +1,3 @@
-# Taylor Mode PINNs
-
-This repository provides a small Python package offering
-Taylor-mode automatic differentiation utilities and a simple
-Kronecker-Factored Approximate Curvature (KFAC) optimizer for
-Physics-informed neural networks (PINNs).
-
-## Installation
-
-The package follows a standard Python layout.  Install it in editable mode
-with
-
-```bash
-pip install -e .
-```
-
-This will make the `taylor_mode`, `kron_utils`, `networks`, and `pinns` modules
-available. The `pinns` module now also exposes a simple `train_pinn` routine
-for quick experiments with KFAC training.  The `pinns.operators` submodule
-includes helpers like `poisson_residual` for assembling common PDE losses,
-as well as convenience functions such as `divergence`.
-
-The operators module now also provides `heat_residual` for the 1D heat
-equation, and `burgers_residual` for Burgers' equation, making it easy
-to experiment with time-dependent problems.
-
-## Example
-
-Several notebooks in the `notebooks/` folder demonstrate the library.
-`02_gradient_operator.ipynb` demonstrates computing gradients using Taylor-mode utilities.
-`04_PINN_loss_demo.ipynb` shows building a simple Poisson PINN using `pinn_loss`.
-`08_KFAC_implementation.ipynb` shows a short linear-regression example using the `KFACOptimizer`.
-`10_pinn_with_kfac.ipynb` demonstrates training a tiny PINN using the KFAC optimizer and the simple MLP utilities from `networks`.
-`11_kfac_training.ipynb` shows the `train_pinn` helper in action.
-`12_poisson_residual_demo.ipynb` demonstrates computing Poisson residuals with
-the new convenience function.
-`13_heat_residual_demo.ipynb` shows how to evaluate the heat equation residual
-using `heat_residual`.
-`14_burgers_residual_demo.ipynb` illustrates evaluating the Burgers equation
-residual with `burgers_residual`.
-`examples/v6_two_tree_solver.py` provides an end-to-end solver in one file.
-
-### 13 End-to-end example (two agents, two trees, EZW preferences)
-
-```python
 """
 examples/v6_two_tree_solver.py
 ---------------------------------------------------------
@@ -54,7 +9,7 @@ block into its future modular home.
 
 Run:
   python examples/v6_two_tree_solver.py --device cpu
-Estimated wall-time on CPU ≈ 3 min (N_FINE=150, batch=256)
+Estimated wall-time on CPU \u2248 3 min (N_FINE=150, batch=256)
 """
 
 # ︙ 1. Imports -------------------------------------------------------------
@@ -71,31 +26,31 @@ ARGS = P.parse_args()
 jax.config.update("jax_platform_name", ARGS.device)
 
 # ︙ 3. Economic primitives -------------------------------------------------
-γA, ψA, ρA = 7.0, .9, .02       # agent A EZW
-γB, ψB, ρB =10.0,1.3, .02       # agent B EZW
-θA = (1-γA)/(1-1/ψA)            # homogeneity coeffs
-θB = (1-γB)/(1-1/ψB)
+\u03b3A, \u03c8A, \u03c1A = 7.0, .9, .02       # agent A EZW
+\u03b3B, \u03c8B, \u03c1B =10.0,1.3, .02       # agent B EZW
+\u03b8A = (1-\u03b3A)/(1-1/\u03c8A)            # homogeneity coeffs
+\u03b8B = (1-\u03b3B)/(1-1/\u03c8B)
 
-κ_u, μ_u, σ_u = 2.5, 0.0, 0.35  # OU drift in *logit* of dividend share
+\u03ba_u, \u03bc_u, \u03c3_u = 2.5, 0.0, 0.35  # OU drift in *logit* of dividend share
 def logistic(u): return jnp.exp(u)/(1+jnp.exp(u))
 
 T, N = 20., 150                 # time-horizon & grid
 BATCH = 256
-eta = 0.0                       # log Pareto weight λA/λB   ← will stay fixed here
+eta = 0.0                       # log Pareto weight \u03bbA/\u03bbB   \u2190 will stay fixed here
 
 # helper to cache algebraic functions
 def cache_eta(eta):
-    λA, λB = jnp.exp(.5*eta), jnp.exp(-.5*eta)
-    λAψ, λBψ = λA**ψA, λB**ψB
-    ratio = (λA/λB)**(1/θB)
+    \u03bbA, \u03bbB = jnp.exp(.5*eta), jnp.exp(-.5*eta)
+    \u03bbA\u03c8, \u03bbB\u03c8 = \u03bbA**\u03c8A, \u03bbB**\u03c8B
+    ratio = (\u03bbA/\u03bbB)**(1/\u03b8B)
     def share_JB(JA):
-        JB = ratio * JA**(-θA/θB)
-        num = λAψ * JA**(ψA*θA)
-        den = num + λBψ * JB**(ψB*θB)
+        JB = ratio * JA**(-\u03b8A/\u03b8B)
+        num = \u03bbA\u03c8 * JA**(\u03c8A*\u03b8A)
+        den = num + \u03bbB\u03c8 * JB**(\u03c8B*\u03b8B)
         return num/den, JB
-    β_lin = ρA + (γA-1)*σ_u**2/(2*ψA)  # linearised discount exponent
-    return λA, λB, share_JB, β_lin
-λA, λB, share_JB, β_lin = cache_eta(eta)
+    \u03b2_lin = \u03c1A + (\u03b3A-1)*\u03c3_u**2/(2*\u03c8A)  # linearised discount exponent
+    return \u03bbA, \u03bbB, share_JB, \u03b2_lin
+\u03bbA, \u03bbB, share_JB, \u03b2_lin = cache_eta(eta)
 
 # ︙ 4. Residual network (depth & width from CLI) ---------------------------
 def resblock(width, key):
@@ -125,23 +80,23 @@ net = ResNet(eqx.nn.Linear(2,ARGS.width,key=k0), blocks,
 # ︙ 5. Generator f(u,y,z) (social-planner HJB ⇔ BSDE driver) --------------
 @functools.partial(jax.jit, static_argnums=0)
 def make_f(eta):
-    λA, _, share_JB, _ = cache_eta(eta)
+    \u03bbA, _, share_JB, _ = cache_eta(eta)
     @jax.jit
     def f(u,y,z):
         x = logistic(u)
         shareA,_ = share_JB(y)
-        M = λA*shareA**(-γA)*y**θA                 # marginal utility index
+        M = \u03bbA*shareA**(-\u03b3A)*y**\u03b8A                 # marginal utility index
         def M_u(uu):
             s,_ = share_JB(y)                     # JA treated const wrt u
-            return λA*s**(-γA)*y**θA
+            return \u03bbA*s**(-\u03b3A)*y**\u03b8A
         dM   = jax.grad(M_u)(u); d2M = jax.grad(jax.grad(M_u))(u)
-        μu   = κ_u*(μ_u-u);  LuM = μu*dM + .5*σ_u**2*d2M
+        \u03bcu   = \u03ba_u*(\u03bc_u-u);  LuM = \u03bcu*dM + .5*\u03c3_u**2*d2M
         r    = -LuM/M
-        k    = -σ_u*dM/M
-        σx   = σ_u * x*(1-x)
-        σlnC = σx * (1-shareA)
-        return θA/(1-γA)*(ρA-γA*r-.5*(θA-1)*(z/σx)**2)*y \
-             + θA*y*(z/σx)*(k-σlnC)
+        k    = -\u03c3_u*dM/M
+        \u03c3x   = \u03c3_u * x*(1-x)
+        \u03c3lnC = \u03c3x * (1-shareA)
+        return \u03b8A/(1-\u03b3A)*(\u03c1A-\u03b3A*r-.5*(\u03b8A-1)*(z/\u03c3x)**2)*y \
+             + \u03b8A*y*(z/\u03c3x)*(k-\u03c3lnC)
     return f
 f = make_f(eta)
 
@@ -164,10 +119,10 @@ def bsde_loss(net, key, step):
         # control-variate pair
         ycv = y_hat - yl
         # tamed Euler
-        μu = κ_u*(μ_u-u); μu = μu/(1+dt*jnp.abs(μu))
-        u1 = u + μu*dt + σ_u*dwi
+        \u03bcu = \u03ba_u*(\u03bc_u-u); \u03bcu = \u03bcu/(1+dt*jnp.abs(\u03bcu))
+        u1 = u + \u03bcu*dt + \u03c3_u*dwi
         y1 = y_hat - f(u,y_hat,z_hat)*dt + z_hat*dwi
-        yl1= yl - β_lin*yl*dt
+        yl1= yl - \u03b2_lin*yl*dt
         return (u1,y1,yl1), ycv[-1]             # pen = last ycv
     (uT,yT,ylT), pen = jax.lax.scan(
         body, (jnp.zeros((BATCH,)), net(0.,0.)[0], jnp.ones((BATCH,))), 
@@ -193,4 +148,3 @@ def residual(u):
     z   = jax.grad(lambda uu: net(0.,uu)[0])(u)
     return f(u,y,z)
 print("max PDE residual", float(jnp.max(jnp.abs(jax.vmap(residual)(grid)))))
-```
