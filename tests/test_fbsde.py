@@ -4,6 +4,30 @@ from fbsde import solve_lq_fbsde
 from fbsde.lq import riccati_solution
 
 
+def test_riccati_solution():
+    mu = 0.1
+    sigma = 0.2
+    Q = 1.0
+    R = 0.5
+    G = 1.0
+    T = 1.0
+    N = 5
+
+    P = riccati_solution(mu, sigma, Q, R, G, T, N)
+
+    dt = T / N
+    P_manual = jnp.zeros(N + 1)
+    P_manual = P_manual.at[-1].set(G)
+    for i in range(N, 0, -1):
+        p_next = P_manual[i]
+        dp = 2 * mu * p_next + sigma ** 2 * p_next ** 2 + Q - 2 * R * p_next
+        P_manual = P_manual.at[i - 1].set(p_next - dt * dp)
+
+    assert P.shape == (N + 1,)
+    assert P[-1] == G
+    assert jnp.allclose(P, P_manual)
+
+
 def test_lq_fbsde_shapes():
     key = jax.random.PRNGKey(0)
     times, X, Y, Z = solve_lq_fbsde(
