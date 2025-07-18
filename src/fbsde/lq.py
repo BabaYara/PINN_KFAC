@@ -76,6 +76,7 @@ def solve_lq_fbsde(
     T: float,
     N: int,
     key: jax.Array,
+    num_paths: int = 1,
 ) -> Tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray, jnp.ndarray]:
     r"""Simulate a linear-quadratic FBSDE with Euler discretisation.
 
@@ -113,33 +114,41 @@ def solve_lq_fbsde(
         Number of time steps.
     key : jax.Array
         PRNG key used to generate Brownian increments.
+    num_paths : int, default=1
+        Number of independent paths to simulate.
 
     Returns
     -------
     tuple of jnp.ndarray
-        ``times``, ``X``, ``Y`` and ``Z`` arrays of shape ``(N+1,)``.
+        ``times`` of shape ``(N+1,)`` and ``X``, ``Y`` and ``Z`` arrays of
+        shape ``(num_paths, N+1)``.
 
     Notes
     -----
-    Currently only a single path of the process is simulated, so the
-    returned arrays all have length ``N+1``.
+    Setting ``num_paths`` greater than one will simulate multiple
+    independent trajectories using vectorised operations.
     """
 
     dt = T / N
     times = jnp.linspace(0.0, T, N + 1)
-    dW = jax.random.normal(key, (N,)) * jnp.sqrt(dt)
+    dW = jax.random.normal(key, (num_paths, N)) * jnp.sqrt(dt)
 
     def forward_step(x, dw):
         return x + mu * x * dt + sigma * dw
 
-    X = jnp.zeros(N + 1)
-    X = X.at[0].set(x0)
-    def f_scan(carry, dw):
-        x = forward_step(carry, dw)
-        return x, x
+    def simulate_path(dw_path):
+        X_path = jnp.zeros(N + 1)
+        X_path = X_path.at[0].set(x0)
 
-    _, xs = jax.lax.scan(f_scan, x0, dW)
-    X = X.at[1:].set(xs)
+        def f_scan(carry, dw):
+            x = forward_step(carry, dw)
+            return x, x
+
+        _, xs = jax.lax.scan(f_scan, x0, dw_path)
+        X_path = X_path.at[1:].set(xs)
+        return X_path
+
+    X = jax.vmap(simulate_path)(dW)
 
     P = riccati_solution(mu, sigma, Q, R, G, T, N)
 
