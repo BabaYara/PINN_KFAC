@@ -10,6 +10,7 @@ from .taylor_mode import (
 from .kron_utils import KFACOptimizer
 from .pinns import gradient, laplacian, pinn_loss, train_pinn
 from .networks import init_mlp, mlp_apply
+from .fbsde import solve_lq_fbsde
 
 __all__ = [
     "Jet",
@@ -24,4 +25,5 @@ __all__ = [
     "init_mlp",
     "mlp_apply",
     "train_pinn",
+    "solve_lq_fbsde",
 ]
