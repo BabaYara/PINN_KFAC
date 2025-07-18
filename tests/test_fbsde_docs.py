@@ -12,5 +12,5 @@ def test_riccati_solution_docstring():
 def test_solve_lq_fbsde_docstring():
     doc = solve_lq_fbsde.__doc__
     assert doc is not None
-    assert "single path" in doc
-    assert "(N+1,)" in doc
+    assert "num_paths" in doc
+    assert "(num_paths, N+1)" in doc
